@@ -1,0 +1,22 @@
+###################################################################
+# A test conf file for the reconf utility
+#
+
+existing_string_setting = 'existing_string'      #   trailing comment
+#existing_string_setting = 'existing_string'      # trailing comment
+
+#  commented_setting = existing-naked-string    # another comment
+commented_setting = existing-naked-string    # another comment
+a_new_setting = with_a_new_value # Added by reconf
+
+double_quoted_string = "existing_string"      # trailing comment
+
+existing_numeric_setting = 666
+
+united_number_setting = 128MB     #  Hope this works!
+
+# Some config files don't use = to assign a value, just trigger on
+# the white space after the setting name.
+a_no_equal_setting and-its-value # with a comment
+
+# End of file comment (adding at end should be after)

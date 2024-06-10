@@ -1,0 +1,8 @@
+# A simple UWSGI style test
+logfile-chown = user:group     # An EOL comment
+
+exec-asap = mkdir -vp /run/uwsgi/app/mysite
+# exec-asap = chown -v www-data:www-data /run/uwsgi/app/mysite # Disabled by reconf
+exec-asap = chmod 755 /run/uwsgi/app/mysite
+
+# End of file

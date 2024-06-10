@@ -1,0 +1,7 @@
+# A simple sshd style test
+    PermitRootLogin prohibit-password   # An EOL comment
+    ListenAddress 0.0.0.0
+    ListenAddress ::
+    
+ # End of file
+ 

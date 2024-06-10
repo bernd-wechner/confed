@@ -1,0 +1,4 @@
+#!/bin/bash
+rm dist/*
+help2man -N src/reconf > man/reconf.1 
+python3 -m build

@@ -1,0 +1,294 @@
+#!/bin/bash
+SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+reconf="$SCRIPT_DIR/../src/reconf"
+
+cd $SCRIPT_DIR/data
+
+# Define usage function
+usage() {
+    echo "Usage: $0 -V [test-number]"
+    echo
+    echo Runs tests and reports PASSED or FAILED for each one and if FAILED a diff between 
+    echo the expected result and what is being produced. 
+    echo
+    echo -V		validate current outputs. Use with EXTREME caution. This is a shortuct 
+    echo        that captures all the current outputs as new expectations for subsequent 
+    echo        tests. It effectively validates the current outputs. So make very sure 
+    echo		that\'s what you want. Of course you can always fetch stable references
+    echo		from git.  Useful if you add new test cases to test.conf. if the script 
+    echo        passes all tests as is, and you add new lines to test.conf you can run 
+    echo		$0 -V to set new references quickly and easily.
+    exit 1
+}
+
+# Parse command-line options
+validate=false
+test_number=""
+while getopts "Vh" opt; do
+    case $opt in
+        V) validate=true ;;
+        h) usage ;;
+        *) usage ;;
+    esac
+done
+
+shift $((OPTIND - 1))
+
+# Check for optional test-number argument
+if [[ $# -gt 1 ]]; then
+    usage
+fi
+
+if [[ $# -eq 1 ]]; then
+    test_number=$1
+    if ! [[ "$test_number" =~ ^[0-9]+$ ]]; then
+        echo "Error: Test number must be a valid number."
+        usage
+    fi
+fi
+
+check_result() {
+    local test="$1"
+    local ref="$2"
+
+	if [ $validate = true ]; then
+		cp "$test.result" "$test.expected"
+		echo "Test $test: Set new expectation/reference"
+	else
+		if [ -e "$test.expected" ]; then
+			if cmp -s "$test.expected" "$test.result"; then
+			    echo "Test $test: PASSED"
+			else
+			    echo "Test $test: FAILED"
+			    diff -u "$test.expected" "$test.result"
+			fi
+		else
+			echo "Test $test: NO EXPECTATION"
+			echo "Here's the change introduced:"
+			diff -u "$ref" "$test.result"
+		fi
+	fi
+
+}
+
+############################################################################
+# Test 01:
+
+if [[ -z "$test_number" || "$test_number" -eq 1 ]]; then
+	test="01 - existing-setting-update"
+	$reconf -i test.conf existing_string_setting new_value > "$test.result"
+	check_result "$test" test.conf
+fi
+
+############################################################################
+# Test 02:
+
+if [[ -z "$test_number" || "$test_number" -eq 2 ]]; then
+	test="02 - commented-setting-update"
+	$reconf -i test.conf commented_setting new_value -o "$test.result"
+	check_result "$test" test.conf
+fi
+
+############################################################################
+# Test 03:
+
+if [[ -z "$test_number" || "$test_number" -eq 3 ]]; then
+	test="03 - numeric-value-update"
+	$reconf -i test.conf existing_numeric_setting 13 -o "$test.result"
+	check_result "$test" test.conf
+fi
+
+############################################################################
+# Test 04:
+
+if [[ -z "$test_number" || "$test_number" -eq 4 ]]; then
+	test="04 - united-number-setting-update"
+	$reconf -i test.conf united_number_setting 24hours -o "$test.result"
+	check_result "$test" test.conf
+fi
+
+############################################################################
+# Test 05:
+
+if [[ -z "$test_number" || "$test_number" -eq 5 ]]; then
+	test="05 - add-new-setting"
+	$reconf -i test.conf a_new_setting "with_a_new_value" -o "$test.result"
+	check_result "$test" test.conf
+fi
+
+############################################################################
+# Test 06:
+
+if [[ -z "$test_number" || "$test_number" -eq 6 ]]; then
+	test="06 - add-new-setting-before"
+	$reconf -i test.conf a_new_setting "with_a_new_value" -b existing_string_setting -o "$test.result"
+	check_result "$test" test.conf
+fi
+
+############################################################################
+# Test 07:
+
+if [[ -z "$test_number" || "$test_number" -eq 7 ]]; then
+	test="07 - add-new-setting-after"
+	$reconf -i test.conf a_new_setting "with_a_new_value" -a commented_setting -o "$test.result"
+	check_result "$test" test.conf
+fi
+
+############################################################################
+# Test 08:
+
+if [[ -z "$test_number" || "$test_number" -eq 8 ]]; then
+	test="08 - delete setting"
+	$reconf -i test.conf united_number_setting -dk -c "Disabled by reconf" -o "$test.result"
+	check_result "$test" test.conf
+fi
+
+############################################################################
+# Test 09:
+
+if [[ -z "$test_number" || "$test_number" -eq 9 ]]; then
+	test="09 - explicit-inplace"
+	cp test.conf temp.conf
+	$reconf -I temp.conf existing_string_setting new_value
+	mv temp.conf "$test.result"
+	check_result "$test" test.conf
+fi
+
+############################################################################
+# Test 10:
+
+if [[ -z "$test_number" || "$test_number" -eq 10 ]]; then
+	test="10 - implicit-inplace" 
+	cp test.conf temp.conf
+	$reconf -i temp.conf existing_string_setting new_value -o temp.conf 
+	mv temp.conf "$test.result"
+	check_result "$test" test.conf
+fi
+
+############################################################################
+# Test 11:
+
+if [[ -z "$test_number" || "$test_number" -eq 11 ]]; then
+	test="11 - add with comment"
+	cp test.conf temp.conf
+	$reconf -i temp.conf new_setting new_value -c "with my new comment" -o temp.conf 
+	mv temp.conf "$test.result"
+	check_result "$test" test.conf
+fi 
+
+############################################################################
+# Test 12:
+
+if [[ -z "$test_number" || "$test_number" -eq 12 ]]; then
+	test="12 - update with comment update"
+	$reconf -i test.conf existing_string_setting new_value -c "with my new comment" -o "$test.result"
+	check_result "$test" test.conf
+fi
+
+############################################################################
+# Test 13:
+
+if [[ -z "$test_number" || "$test_number" -eq 13 ]]; then
+	test="13 - update with new comment"
+	$reconf -i test.conf existing_numeric_setting 30sec -c "with my new comment" -o "$test.result"
+	check_result "$test" test.conf
+fi
+
+############################################################################
+# Test 14:
+
+if [[ -z "$test_number" || "$test_number" -eq 14 ]]; then
+	test="14 - a noequal setting"
+	$reconf -i test.conf a_no_equal_setting a_new_value -c "with a new comment" -A -o "$test.result" 
+	check_result "$test" test.conf
+fi
+
+############################################################################
+# Test 15:
+
+if [[ -z "$test_number" || "$test_number" -eq 15 ]]; then
+	test="15 - ssh config test - modify"
+	$reconf --ssh -i test.ssh PermitRootLogin no -c "disable root login" -o "$test.result" 
+	check_result "$test" test.ssh
+fi
+
+############################################################################
+# Test 16:
+
+if [[ -z "$test_number" || "$test_number" -eq 16 ]]; then
+	test="16 - ssh config test - add multi"
+	$reconf --ssh -i test.ssh ListenAddress "127.0.0.1" -c "add local loopback" -m -o "$test.result" 
+	check_result "$test" test.ssh
+fi
+
+############################################################################
+# Test 17:
+
+if [[ -z "$test_number" || "$test_number" -eq 17 ]]; then
+	test="17 - ssh config test - del multi"
+	$reconf --ssh -i test.ssh -d ListenAddress "::" -m -o "$test.result" 
+	check_result "$test" test.ssh
+fi
+
+############################################################################
+# Test 18:
+
+if [[ -z "$test_number" || "$test_number" -eq 18 ]]; then
+	test="18 - sudoers config test"
+	$reconf --sudo -i test.sudo -mdk Defaults mail_badpass -o "$test.result" 
+	check_result "$test" test.sudo
+fi
+
+############################################################################
+# Test 19:
+
+if [[ -z "$test_number" || "$test_number" -eq 19 ]]; then
+	test="19 - sudoers config test - modify"
+	$reconf --sudo -i test.sudo "%admin" "ALL=NOPASSWD: ALL" -c "Fix admin acccess" -o "$test.result" 
+	check_result "$test" test.sudo
+fi
+
+############################################################################
+# Test 20:
+
+if [[ -z "$test_number" || "$test_number" -eq 20 ]]; then
+	test="20 - sudoers config test - complex multiple delete"
+	$reconf --sudo -WRA "=" -i test.sudo -dk "Defaults\s+secure_path" -c "Remove secure path" -o "$test.result" 
+	check_result "$test" test.sudo
+fi
+
+############################################################################
+# Test 21:
+
+if [[ -z "$test_number" || "$test_number" -eq 21 ]]; then
+	test="21 - php config test"
+	$reconf --php -i test.php error_reporting "E_ALL & ~E_DEPRECATED" -c "Modified by reconf" -o "$test.result" 
+	check_result "$test" test.php
+fi
+
+############################################################################
+# Test 22:
+
+if [[ -z "$test_number" || "$test_number" -eq 22 ]]; then
+	test="22 - php config test - file path"
+	$reconf --php -i test.php error_log "'/var/log/php.log'" -o "$test.result" 
+	check_result "$test" test.php
+fi
+
+############################################################################
+# Test 23:
+
+if [[ -z "$test_number" || "$test_number" -eq 23 ]]; then
+	test="23 - uwsgi config test - chown test"
+	$reconf --uwsgi -i test.uwsgi logfile-chown "www-data:www-data" -c "Fixed by reconf" -o "$test.result" 
+	check_result "$test" test.uwsgi
+fi
+
+############################################################################
+# Test 24:
+
+if [[ -z "$test_number" || "$test_number" -eq 24 ]]; then
+	test="24 - uwsgi config test - multi delete test"
+	$reconf --uwsgi -i test.uwsgi -mdkr exec-asap "chown\s+.*" -o "$test.result" 
+	check_result "$test" test.uwsgi
+fi

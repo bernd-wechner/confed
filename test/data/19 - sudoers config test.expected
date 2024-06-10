@@ -1,0 +1,6 @@
+# A simple sudoers style test
+    Defaults    mail_badpass
+    Defaults    secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
+    %admin ALL=NOPASSWD: ALL    # Fix admin acccess
+
+# End of file
