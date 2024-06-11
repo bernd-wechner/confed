@@ -1,4 +1,4 @@
-# reconf
+# confed
 
 A command line tool for programmatically modifying text-based configuration files.
 
@@ -10,47 +10,47 @@ Typically we'd use standard tools like [sed](https://manpages.org/sed), [awk](ht
 - 'value'
 - "value"
 
-Well, say goodbye to all that, and avoid regular expressions for the best part and indulge in the [Python flavor](https://docs.python.org/3/howto/regex.html) if you must, using `reconf` instead.
+Well, say goodbye to all that, and avoid regular expressions for the best part and indulge in the [Python flavor](https://docs.python.org/3/howto/regex.html) if you must, using `confed` instead.
 
-`reconf` is a command line tool written in Python (and so can offer Pythonic regular expressions) that means to make it much easier. The very use case that justified writing it one afternoon was changing the [postgresql](https://www.postgresql.org/) data-directory:
+`confed` is a command line tool written in Python (and so can offer Pythonic regular expressions) that means to make it much easier. The very use case that justified writing it one afternoon was changing the [postgresql](https://www.postgresql.org/) data-directory:
 
 ```
-reconf -I /etc/postgresql/14/main/postgresql.conf data_directory /data/postgresql/14/main
+confed -I /etc/postgresql/14/main/postgresql.conf data_directory /data/postgresql/14/main
 ```
 
 and it's done. 
 
-`reconf` will scan the input file (`/etc/postgresql/14/main/postgresql.conf` in this example), find all lines that appear to defined the specified setting (`data_directory` in this example) and add a definition that sets it to the specified value (`/data/postgresql/14/main` in  this example) just after any existing lines it found setting the value, comment out the existing definition and  respect the quoting convention it found when adding the new. 
+`confed` will scan the input file (`/etc/postgresql/14/main/postgresql.conf` in this example), find all lines that appear to defined the specified setting (`data_directory` in this example) and add a definition that sets it to the specified value (`/data/postgresql/14/main` in  this example) just after any existing lines it found setting the value, comment out the existing definition and  respect the quoting convention it found when adding the new. 
 
-## Installing reconf
+## Installing confed
 
 Simply:
 
 ```
-sudo pip install reconf
+sudo pip install confed
 ```
 
 if for any odd reason you lack pip, install that: https://pip.pypa.io/en/stable/installation/
 
 And if you lack Python, you're probably not configuring any popular distro of *nix, but it's easy to get: https://www.python.org/downloads/
 
-## Using reconf
+## Using confed
 
-The best help is provided by reconf itself:
+The best help is provided by confed itself:
 
 ```
-reconf --help
+confed --help
 ```
 
 or [RTFM](https://en.wiktionary.org/wiki/RTFM):
 
 ```
-man reconf
+man confed
 ```
 
 The basics to note are:
 
-`reconf` supports single line settings only. More complex grammars with multiple lines used to define a configuration setting are not (yet) supported.
+`confed` supports single line settings only. More complex grammars with multiple lines used to define a configuration setting are not (yet) supported.
 
 The four most important concepts are:
 
@@ -65,14 +65,14 @@ Other important concepts:
 - The **ASSIGNMENTCHARACTER** defaults to '=' and is what separates the **setting** from the **value**. If empty then white space separates them (one or more space or tab characters). Any character can be specified with `-A/--AssignmentCharacter`. Only single character definitions are tested and supported (at present) but you can always experiment with strings.
 - **NAMECHARACTERS** is a is list of legal characters in setting names and can be specified with `-N/--NameCharacters`. Sensible defaults are in place. 
 - **VALUECHARACTERS** is a is list of legal characters in setting values and can be specified with `-V/--ValueCharacters`. Sensible defaults are in place.
-- `-m/--multiple` is an important argument that lets `reconf` know that the nominated setting can validly be set multiple time in the one configuration file. If that's not specified `reconf` will only leave one definition of that setting uncommented in the output. If it is specified then `'-d/--delete` is available to delete a specific setting/value pair from such a multiple set, and `-r/--regex` to help specifiy values and settings a little more flexibly (than literally).
+- `-m/--multiple` is an important argument that lets `confed` know that the nominated setting can validly be set multiple time in the one configuration file. If that's not specified `confed` will only leave one definition of that setting uncommented in the output. If it is specified then `'-d/--delete` is available to delete a specific setting/value pair from such a multiple set, and `-r/--regex` to help specifiy values and settings a little more flexibly (than literally).
 - Configuration defaults are pre-implemented for some common configuration file formats:
   - `--postgres` for [PostgreSQL](https://www.postgresql.org/) configuration file defaults
   - `--ssh` for [ssh and sshdaemon](https://linuxhandbook.com/enable-ssh-ubuntu/) style configuration file defaults.
   - `--sudo` for [`\etc\sudoers`](https://help.ubuntu.com/community/Sudoers) style configuration defaults.
   - `--php` for [PHP](https://www.php.net/) configuration defaults.
   - `--uwsgi` for [uWSGI](https://uwsgi-docs.readthedocs.io/en/latest/) configuration file defaults.
-- Testing - always test you proposed changes using the `-t/--test` option. That will make no changes (leave everything inctact) but display a [diff](https://manpages.org/diff) of the changes it *would* apply, so you can feel sure you have the name and value right and `reconf` is doing what you need. 
+- Testing - always test you proposed changes using the `-t/--test` option. That will make no changes (leave everything inctact) but display a [diff](https://manpages.org/diff) of the changes it *would* apply, so you can feel sure you have the name and value right and `confed` is doing what you need. 
 
 
 

@@ -1,4 +1,5 @@
 #!/bin/bash
+package=$(basename $(dirname $(readlink -f "$0")))
 rm dist/*
-help2man -N src/reconf > man/reconf.1 
+help2man -N src/$package > man/$package.1 
 python3 -m build

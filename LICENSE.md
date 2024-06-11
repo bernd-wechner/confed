@@ -1,4 +1,4 @@
-**Django Lighttpd Middleware** Copyright 2021 (Bernd Wechner)(“Licensor”)
+**confed** Copyright 2021 (Bernd Wechner)(“Licensor”)
 
 **HIPPOCRATIC LICENSE **
 

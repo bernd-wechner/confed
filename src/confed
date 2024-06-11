@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # encoding: utf-8
 '''
-reconf -- Programatically update a setting in a configuration file 
+confed -- Programatically update a setting in a configuration file 
 
 @author:     Bernd Wechner
 
@@ -19,7 +19,7 @@ from io import BytesIO
 from argparse import ArgumentParser, HelpFormatter,FileType
 from tempfile import NamedTemporaryFile
 
-__prog__ = "reconf"
+__prog__ = "confed"
 __all__ = []
 __version__ = 0.1
 __date__ = '2024-05-11'
