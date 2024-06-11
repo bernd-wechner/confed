@@ -12,7 +12,7 @@ double_quoted_string = "existing_string"      # trailing comment
 
 existing_numeric_setting = 666
 
-# united_number_setting = 128MB     #  Disabled by reconf
+# united_number_setting = 128MB     #  Disabled by confed
 
 # Some config files don't use = to assign a value, just trigger on
 # the white space after the setting name.

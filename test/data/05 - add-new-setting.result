@@ -20,4 +20,4 @@ a_no_equal_setting and-its-value # with a comment
 
 # End of file comment (adding at end should be after)
 
-a_new_setting = with_a_new_value # Added by reconf
+a_new_setting = with_a_new_value # Added by confed

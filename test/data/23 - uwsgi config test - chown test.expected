@@ -1,5 +1,5 @@
 # A simple UWSGI style test
-logfile-chown = www-data:www-data     # Fixed by reconf
+logfile-chown = www-data:www-data     # Fixed by confed
 
 exec-asap = mkdir -vp /run/uwsgi/app/mysite
 exec-asap = chown -v www-data:www-data /run/uwsgi/app/mysite

@@ -2,7 +2,7 @@
 # A test conf file for the reconf utility
 #
 
-a_new_setting = with_a_new_value # Added by reconf
+a_new_setting = with_a_new_value # Added by confed
 existing_string_setting = 'existing_string'      #   trailing comment
 #existing_string_setting = 'existing_string'      # trailing comment
 

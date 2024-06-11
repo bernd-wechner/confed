@@ -7,7 +7,7 @@ existing_string_setting = 'existing_string'      #   trailing comment
 
 #  commented_setting = existing-naked-string    # another comment
 commented_setting = existing-naked-string    # another comment
-a_new_setting = with_a_new_value # Added by reconf
+a_new_setting = with_a_new_value # Added by confed
 
 double_quoted_string = "existing_string"      # trailing comment
 

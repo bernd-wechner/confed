@@ -1,5 +1,5 @@
 # A simple sudoers style test
-#     Defaults    mail_badpass     # Not a bad option (Disabled by reconf)
+#     Defaults    mail_badpass     # Not a bad option (Disabled by confed)
     Defaults    secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
     %admin ALL=(ALL) ALL    # An EOL comment
 
