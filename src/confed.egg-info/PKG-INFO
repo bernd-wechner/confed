@@ -1,3 +1,21 @@
+Metadata-Version: 2.1
+Name: confed
+Version: 0.1
+Summary: A tool for programmatic editing of configuration files
+Home-page: https://github.com/bernd-wechner/confed
+Author: Bernd Wechner
+Author-email: bwechner@yahoo.com
+Project-URL: Bug Tracker, https://github.com/bernd-wechner/confed/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: Freely Distributable
+Classifier: Operating System :: OS Independent
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: System Administrators
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE.md
+
 # confed
 
 A command line tool for programmatically modifying text-based configuration files.
@@ -36,7 +54,7 @@ And if you lack Python, you're probably not configuring any popular distro of *n
 
 ## Using confed
 
-The best help is provided by `confed` itself:
+The best help is provided by confed itself:
 
 ```
 confed --help
@@ -74,76 +92,10 @@ Other important concepts:
   - `--uwsgi` for [uWSGI](https://uwsgi-docs.readthedocs.io/en/latest/) configuration file defaults.
 - Testing - always test you proposed changes using the `-t/--test` option. That will make no changes (leave everything inctact) but display a [diff](https://manpages.org/diff) of the changes it *would* apply, so you can feel sure you have the name and value right and `confed` is doing what you need. 
 
-## Examples
 
-The test script tries to cover all the supported use cases  and variants (clearly, to keen an eye on stability and that everything still works when tweaking the script). Here's a (not exhaustive) list of them:
-
-- `confed setting_name setting_value < old.conf >  new.conf`
-
-  Reads `old.conf`, cleanly adds a line that sets s*etting_name* to *setting_value* and writes it to `new.conf` being as clean and clever about it as it can be.
-
-- `confed setting_name setting_value -i old.conf -o new.conf`
-
-  Same thing using command line options rather than standard io streams.
-
-- `confed setting_name setting_value -I test.conf`
-
-  Reads  `test.conf` and writes back to it the modified version. An in place edit.
-
-- `confed setting_name setting_value -tI test.conf`
-
-  Same thing except it's a non destructive test that prints to stdout the diff between the original and what it would have written. Important for testing any modification not least an in-place modification to see it's doing what you want!
-
-- `confed -i test.conf setting_name setting_value -c "An end of line comment"`
-
-  Reads `test.conf` adding a line to that sets *setting_name* to *setting_value* and adds an end of line comment of "An end of line comment" to that line (so so you can leave a record whys and wherefores)
-
-- `confed --ssh -I /etc/ssh/sshd_config ListenAddress "127.0.0.1" -c "**add local loopback" -m`
-
-  Using ssh configuration syntax and knowing that *ListenAddress* can appear multiple times (`-m`) adds a definition  setting one at *127.0.0.1* in the ssh daemon configuration file.
-
-  The `-m`is crucial here or `confed` would comment out all other lines that seem to set *ListenAddress* at the same time!
-
-  `confed` performs an in place edit here and keeps no backup so that you're responsible for that, and using the `-t` option prudently to test non-destructively first.
-
-- `confed --ssh -I /etc/ssh/sshd_config -d ListenAddress "::" -m`
-
-  Similar to previous example but deletes (`-d`) any line that sets *ListenAddress* to "::".
-
-- `confed --ssh -I /etc/ssh/sshd_config -mdk ListenAddress "::"`
-
-  Same again only keeps (`-k`) the line commenting it out instead of deleting it!
-
-- `confed --ssh -I /etc/ssh/sshd_config -mdkr ListenAddress "198\..*"`
-
-  Same again but deletes any lines (comments them out) that which match the regular expression "ListenAddress\s+198\..*"
-
-  The name (ListenAddress) is also interpreted as a regular expression so for safety you might consider using "^ListenAddress$". While completely hypothetical ListenAddress may match MyListenAddress and ListenAddressTheSecond or OnTheLeftListenAddressOnTheRight etc. IN fact n guarantees here, use `-t`! If you ever apply regular expressions anywhere without testing you probably drive without a seat belt on and cross roads without looking, good luck!
-
-## Alternatives and similar projects
-
-One of the main advantages of publishing a system tool on [PyPI](https://pypi.org/) is that it can me installed with pip on almost nay distro and OS without trouble. One of drawbacks of publishing a command line tool on PyPI is that anyone can and so it's a free for all on names.  
-
-In writing this I'd called it reconf.  But lo and behold:
-
-https://pypi.org/project/reconf/
-
-A 2015 project a light extension of [ConfigParser](https://docs.python.org/3/library/configparser.html) in Python 2.7 last touched in 2015!
-
-And all these names were taken:
-
-- [configure](https://pypi.org/project/configure/) - a YAML configuration library last tocuhed in 2012
-- [reconfigure](https://pypi.org/project/reconfigure/) - an undocument package uploaded in 202 with no clue what it's about.
-- [confit](https://pypi.org/project/confit/) - a (supposedly) complete and easy-to-use configuration framework with a fair stab at [comparisons with alternatives](https://aphp.github.io/confit/latest/alternatives/) and still ind evelopment but not a command line tool pitching at this need.
-- [confiture](https://pypi.org/project/confiture/) - an (allegedly) advanced configuration parser , not touched since 2016 listed with a dead [homepage](https://idevelop.org/p/confiture/) but clearly migrated to github: https://github.com/NaPs/Confiture (without updating the PyPI listing)
-- [ced](https://pypi.org/project/ced/) - a nice variant on sed, namewise, but taken bya very lightweight stab at something similar in fact. Poorly documented alas and not touched since 2017. It is indeed very lightweight and a simple wrapper around [string.Template](https://docs.python.org/3/library/string.html#template-strings).
-
-And that is just a sampling of the PyPI landscape touched on in trying to find an available name there. There is a plethora a more targeted and diverse configuration file editing tools out in the wild, but I couldn't find one that was just that small step up from sed, which would make it easy peasy to alter configuration files from scripts I use to manage servers.
 
 ## Contributing
 
 Code contributions are always welcome. If you need more features, like more complex settings or different flavours of default
 
 Simply submit a [pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests) and consider following [best practices](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/getting-started/best-practices-for-pull-requests).
-
-Above all, make sure your modified script passes all the tests and add tests for any new use cases you've added support for! The test scrip is simple bash and all it does is run `confed` on a test file, and compare the result against a recorded expectation reporting PASS or FAIL. It's not rocket science, and a testing framework as simple as this one file script is. Not many bells and whistles. 
