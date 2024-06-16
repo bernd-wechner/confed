@@ -34,6 +34,52 @@ if for any odd reason you lack pip, install that: https://pip.pypa.io/en/stable/
 
 And if you lack Python, you're probably not configuring any popular distro of *nix, but it's easy to get: https://www.python.org/downloads/
 
+**Note:** That is a system wide installation and not actually highly recommended on any system in which python and python packages are relevant system tools, which increasingly is many a distro with a desktop environment. Servers are generally safer, but either way you may prefer some safer options so...
+
+### Safer options
+
+Yes, `sudo pip install` is not always the safest options, so it pays to be careful. The reason is that increasingly there are system tools (especially in desktop environments), that are written in Python. It is after all [the most popular of languages](https://www.hackerrank.com/blog/most-popular-languages-2024/). And Python brings with it package dependencies, `confed` for example depends upon the package `pyparsing` and a particular version of Python too ...and you system may have an older version of Python or an older version of `pyparsing`  installed and they are not always backward compatible ... 
+
+For that reason Python supports and is it is ubiquitously recommended to use, virtual environments ([venvs](https://docs.python.org/3/library/venv.html)). The only problem is they are a modest hassle to implement, not huge but modest, and so there are a few possible approaches to isolating a given pip install from the system Python environment:
+
+#### Make a venv and deploy in it
+
+Bit of a hassle, not least as you need to make a decision on where to house the venv. Let's assume you're using `/opt/venvs` to house system level (not user level) venvs (as good a place as any) then:
+
+```
+python -m venv /opt/venvs/confed  			# create the venv
+source /opt/venvs/confed/bin/activate		# activate it
+sudo -E pip install confed					# pip will now install into that venv
+```
+
+should do the job, but aside from being cumbersome it's bothersome, we' can expect confed to be installed in the venv too at `/opt/venvs/confed/bin/confed` and so you'd need `/opt/venvs/confed/bin` in you [PATH](https://en.wikipedia.org/wiki/PATH_(variable)) to run it.
+
+Conclusion, lot of hassle and kludgy.
+
+### Isolate it in user space
+
+Much simpler is just:
+
+```
+python install --user confed
+```
+
+and this will install it in user space, and it will (probably) be in your path and can run it with `condfed`. The only drawback is, that's only available to the user logged in who installed it (in `~/.local/bin` typically). That is usually fine though and if it is, this is simple and the clean and the easiest solution. 
+
+Conclusion: Easy, safe and convenient. But tool is not available globally at system level
+
+### use pipx
+
+[pipx](https://github.com/pypa/pipx) is a great tool for installing scripts at system level in isolated environments! It's designed or just this. And in theory once it's installed it's as simple as:
+
+```
+pipx install --global confed
+```
+
+Well, that's pipx's goal anyhow. The problem is it's still in heavy development and evolving so, for example the latest version is 1.6.0 at time of writing which supports install `--global` but the Ubuntu distribution (`sudo apt install pipx`) is 1.0 which doesn't support the `--global` option yet. So first you have to work out how to install 1.6 and that's a hassle right there. You see pix is a python tool itself so the question of installing it in an isolated environment with pip emerges see [Installing confed](#Installing_confed) above (and we have a recursive issue). 
+
+Conclusion: Could be great but getting the right version is as complicated as the problem we're trying to solve and so not simple approach.
+
 ## Using confed
 
 The best help is provided by `confed` itself:
