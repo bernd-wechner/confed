@@ -288,7 +288,61 @@ fi
 # Test 24:
 
 if [[ -z "$test_number" || "$test_number" -eq 24 ]]; then
-	test="24 - uwsgi config test - multi delete test"
-	$confed --uwsgi -i test.uwsgi -mdkr exec-asap "chown\s+.*" -o "$test.result" 
+	test="24 - uwsgi config test - multi delete test (regex value test)"
+	$confed --uwsgi -i test.uwsgi -mdkr "chown\s+.*" exec-asap -o "$test.result" 
 	check_result "$test" test.uwsgi
+fi
+
+############################################################################
+# Test 25:
+
+if [[ -z "$test_number" || "$test_number" -eq 25 ]]; then
+	test="25 - list single value"
+	$confed -li test.conf existing_string_setting -o "$test.result" 
+	check_result "$test" test.list
+fi
+
+############################################################################
+# Test 26:
+
+if [[ -z "$test_number" || "$test_number" -eq 26 ]]; then
+	test="26 - list multiple values"
+	$confed --ssh -i test.ssh ListenAddress -lm -o "$test.result" 
+	check_result "$test" test.mlist
+fi
+
+############################################################################
+# Test 27:
+
+if [[ -z "$test_number" || "$test_number" -eq 27 ]]; then
+	test="27 - HBA config test - plain"
+	$confed --postgres-hba -lm host -i test.hba -o "$test.result" 
+	check_result "$test" test.hba
+fi
+
+############################################################################
+# Test 28:
+
+if [[ -z "$test_number" || "$test_number" -eq 28 ]]; then
+	test="28 - HBA config test - regex name test"
+	$confed --postgres-hba -lmR 'host\s+all\s+all' -i test.hba -o "$test.result" 
+	check_result "$test" test.hba-regex-name
+fi
+
+############################################################################
+# Test 29:
+
+if [[ -z "$test_number" || "$test_number" -eq 29 ]]; then
+	test="29 - Regex Value Find and Replace"
+	$confed --postgres-hba -muRr '127\.0\..*' 'host\s+all\s+all' "191.168.0.0/24\tscram-sha-256" -i test.hba -o "$test.result" 
+	check_result "$test" test.regex-find-and-replace
+fi
+
+############################################################################
+# Test 30:
+
+if [[ -z "$test_number" || "$test_number" -eq 30 ]]; then
+	test="30 - HBA config test - whole lines on regex match"
+	$confed --postgres-hba -LmR 'host\s+all\s+all' -i test.hba -o "$test.result" 
+	check_result "$test" test.hba-regex-name-whole-lines
 fi

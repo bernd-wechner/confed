@@ -101,7 +101,7 @@ The basics to note are:
 The four most important concepts are:
 
 - **setting** - the name of a configuration setting.
-- **value** - the value you'd like to set it to.
+- **value** - the value you'd like to set it to - or use `-l/--list` to simply list existing value(s).
 - **INPUT** - the configuration it reads. If not specified will read [stdin](https://en.wikipedia.org/wiki/Standard_streams). With `-i/--input` will read a nominated file and with `-I/--Inplace` will read a dominated file and write back to it! (It keeps no backup, so test well before doing that and consider in your script or generally, keeping backups).
 - **OUTPUT** -  If not specified will write to [stdout](https://en.wikipedia.org/wiki/Standard_streams) otherwise with -`o/--output` will write to a nominated file. If the same file as INPUT is nominated is the same as  `-I/--Inplace` (which is shorthand for that) . It makes no sense to specify both -`o/--output`  and  `-I/--Inplace`.
 
@@ -124,6 +124,9 @@ Other important concepts:
 
 The test script tries to cover all the supported use cases  and variants (clearly, to keen an eye on stability and that everything still works when tweaking the script). Here's a (not exhaustive) list of them:
 
+- `confed -l setting_name < settings.conf`
+  Reads `settings.conf` and reports any value(s) that `setting_name` is set to.
+  
 - `confed setting_name setting_value < old.conf >  new.conf`
 
   Reads `old.conf`, cleanly adds a line that sets s*etting_name* to *setting_value* and writes it to `new.conf` being as clean and clever about it as it can be.
@@ -148,7 +151,7 @@ The test script tries to cover all the supported use cases  and variants (clearl
 
   Using ssh configuration syntax and knowing that *ListenAddress* can appear multiple times (`-m`) adds a definition  setting one at *127.0.0.1* in the ssh daemon configuration file.
 
-  The `-m`is crucial here or `confed` would comment out all other lines that seem to set *ListenAddress* at the same time!
+  The `-m` is crucial here or `confed` would comment out all other lines that seem to set *ListenAddress* at the same time!
 
   `confed` performs an in place edit here and keeps no backup so that you're responsible for that, and using the `-t` option prudently to test non-destructively first.
 
@@ -164,7 +167,31 @@ The test script tries to cover all the supported use cases  and variants (clearl
 
   Same again but deletes any lines (comments them out) that which match the regular expression "ListenAddress\s+198\..*"
 
-  The name (ListenAddress) is also interpreted as a regular expression so for safety you might consider using "^ListenAddress$". While completely hypothetical ListenAddress may match MyListenAddress and ListenAddressTheSecond or OnTheLeftListenAddressOnTheRight etc. IN fact n guarantees here, use `-t`! If you ever apply regular expressions anywhere without testing you probably drive without a seat belt on and cross roads without looking, good luck!
+  The name (ListenAddress) is also interpreted as a regular expression so for safety you might consider using "^ListenAddress$". While completely hypothetical ListenAddress may match MyListenAddress and ListenAddressTheSecond or OnTheLeftListenAddressOnTheRight etc. In fact because that is so dangerous, use `-t`! If you ever apply regular expressions anywhere without testing you probably drive without a seat belt on and cross roads without looking, good luck!
+
+### Regular expressions and other trickery
+
+`confed` is built to edit most types of configuration file from the command line and conveniently from within your scripts. Some formats don't conform the basic premise of "setting = value" even after we allow for the very flexible options around setting names (`-N/--NameCharacters`), assignment characters (`-A/--AssignmentCharacter`), legal value characters (`-V/--ValueCharacters`) and comment character (`-C/--CommentCharacter`).
+
+To help with those `confed` supports regular expressions in two contexts:
+
+`-R/--regex-name` which asks it to take the provided setting name as a regular expression. For example to list all of the settings in a postgresql configuration file:
+
+```confed --postgres -lmR '.*' ```
+
+Not that `.*` matches all settings and we need `-m` to let `confed` know we expect more than 1 hit! The `--RegExName` works the same way but is case dependent if you should desire that.
+
+You can fro example set a group of options `on` in a PostgreSQL configuration:
+
+```confed --postgres -lmR 'enable_(bitmapscan|hashtag|sort|tidcan)' on```
+
+Similarly the `-r/--regex-value` works on setting values rather than setting names. Because lines containing a given value can be listed, deleted or importantly updated - this option needs to differentiate between the pattern used to match and the new value you might want set and so needs it's own regular expression as an argument.  For example you might like (unlikely, but just to illustrate) set all threshold values currently under 100 to 100:
+
+```confed --postgres -lmR '.*_threshold' on -ur '\d\d' '100'```
+
+Note use of the `-u/--UnescapeValue` option needed so that confed sees `\d` and `\\d` alas. There's a `-U/--UnescapeName` option to do same for name regexes if they contain escaped characters (i.e. with `\`)
+
+Then there are files that are not at all l in the "setting = value" format, in which case, these options can be combined to produce some useful edits.  Experimentation is always recommended with the `-t/--test` option,  but a pattern already used is for PostgreSQL HBA (Host Based Authentication) configuration files which have a few columns of data, but the Linux `fstab` files are similar, and similar tricks are possible. us `-A/--AssignmentChar` to set the assignment character to nothing ('') and allow white space in names (`-W/--WhiteSpaceNames`) and values (`-w/--WhiteSpaceValues`) in use the regex options to match whatever part of a line you like, and alter the rest of the line as its value. There's a `--postgres-hba` configuration that basically does that and allows a few of the standard special chars we know exist in HBA lines in values as well.  Always test before making scripted edits!
 
 ## Alternatives and similar projects
 

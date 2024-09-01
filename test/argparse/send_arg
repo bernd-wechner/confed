@@ -1,0 +1,6 @@
+#!/bin/bash
+# A one-liner to test the transport of a test regex over the bash command line via argparse into Python.
+echo $(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CMD="$DIR/receive_arg"
+$CMD '^[\^\$\.\[\]\|\(\)\?\*\+\{\}][a-zA-Z0-9]*\d+\B\s\S\w\W\d\D\A\Z\z\G\<\>(?=.*)(?!.*)(?<=.)(?<!.)|(?:)?(?P<name>.*)(?P=name)(?#comment)(?(1)then|else)-backslash-\\-backspace-\b-tab-\t-newline-\n-return-\r-end-$'

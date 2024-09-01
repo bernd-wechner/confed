@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+# encoding: utf-8
+'''
+Small Python test using argparse to receive a string which is a regular expression or Python strin
+for a test of delivery and unescaping methods to use.
+
+The test is to see that it arrived unaltered through the command line.
+
+Special codes Python regexes use:
+
+	Anchors and Basic Symbols:
+	
+	    ^ - Start of the string.
+	    $ - End of the string.
+	    . - Any character except a newline.
+	    \ - Escape character.
+	    [] - Character class.
+	    | - Alternation.
+	    () - Grouping.
+	    ? - Zero or one occurrence (non-greedy quantifier when used after *, +, or {}).
+	    * - Zero or more occurrences.
+	    + - One or more occurrences.
+	    {} - Specified number of occurrences.
+	
+	Character Classes:
+	
+	    \b - Word boundary.
+	    \B - Non-word boundary.
+	    \s - Whitespace character.
+	    \S - Non-whitespace character.
+	    \w - Word character (alphanumeric + underscore).
+	    \W - Non-word character.
+	    \d - Digit.
+	    \D - Non-digit.
+	    \n - Newline.
+	    \r - Carriage return.
+	    \t - Tab.
+	    \A - Start of the string (anchor).
+	    \Z - End of the string (anchor).
+	    \z - End of the string (absolute).
+	    \G - End of the previous match.
+	    \< - Start of a word.
+	    \> - End of a word.
+	
+	Assertions:
+	
+	    (?=...) - Positive lookahead.
+	    (?!...) - Negative lookahead.
+	    (?<=...) - Positive lookbehind.
+	    (?<!...) - Negative lookbehind.
+	
+	Named Groups and References:
+	
+	    (?P<name>...) - Named group.
+	    (?P=name) - Reference to a named group.
+	
+	Non-Capturing Group:
+	
+	    (?:...) - Non-capturing group.
+	
+	Conditional Expression:
+	
+	    (?(...)then|else) - Conditional expression.
+	
+	Comment:
+	
+	    (?#comment) - Inline comment.
+
+And special codes Python strings use:
+
+	\n: Newline
+	\t: Tab
+	\\: Backslash
+	\": Double quote
+	\': Single quote
+	\a: ASCII Bell (alert)
+	\b: Backspace
+	\f: Form feed
+	\r: Carriage return
+	\v: Vertical tab
+	\141: Octal value for 'a'
+	\x41: Hexadecimal value for 'A'
+	\u263A: Unicode character (☺)
+	
+'''
+import ast
+from argparse import ArgumentParser
+
+# This is our test Regular expression that contains all the regular epression elments and special characters 
+# and special characters that Python supports at time of writing. Pass this stinrtg (in the single quotes) 
+# into this script from bash and we'll check it arrived intact.
+test_arg = r'^[\^\$\.\[\]\|\(\)\?\*\+\{\}][a-zA-Z0-9]*\d+\B\s\S\w\W\d\D\A\Z\z\G\<\>(?=.*)(?!.*)(?<=.)(?<!.)|(?:)?(?P<name>.*)(?P=name)(?#comment)(?(1)then|else)-backslash-\\-backspace-\b-tab-\t-newline-\n-return-\r-end-$'
+
+def unescape(string):
+    #return string.encode('latin-1', 'backslashreplace').decode('unicode-escape')
+	#return ast.literal_eval("'"+string+"'")
+    return ast.literal_eval("'"+string.replace(r'\b', r'\\b')+"'").replace(r'\\b', r'\b')
+
+
+parser = ArgumentParser()
+parser.add_argument('string')
+args = parser.parse_args()
+
+if args.string == test_arg:
+	print("PASSED")
+	print(f"original repr:  {repr(test_arg)}")
+	print(f"unescaped repr: {repr(unescape(test_arg))}")
+	print(f"unescaped str:   {unescape(test_arg)}")
+else:
+	print("FAILED!")
