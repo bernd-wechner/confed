@@ -12,7 +12,7 @@ confed -- Programatically update a setting in a configuration file
 @contact:    YndlY2huZXJAeWFob28uY29t    (base64 encoded)
 @deffield    updated: 7/6/2024
 '''
-import sys, os, re, textwrap, subprocess, codecs, ast
+import sys, os, re, textwrap, subprocess, codecs, ast, warnings
 import pyparsing as pp
 
 from io import BytesIO
@@ -21,11 +21,11 @@ from tempfile import NamedTemporaryFile
 
 __prog__ = "confed"
 __all__ = []
-__version__ = 0.6
+__version__ = 0.9
 __date__ = '2024-05-11'
-__updated__ = '2024-09-01'
+__updated__ = '2024-09-25'
 
-ASSIGN_CHAR = '='
+ASSIGN_CHARS = '='
 COMMENT_CHARS = '#'
 NAME_CHARS = '_'
 VALUE_CHARS = '-.'
@@ -37,6 +37,9 @@ VALUE_CHARS = '-.'
 # the basic list, but we support only single line processing for now and so are content with
 # the basic two.   
 WHITE_SPACE = ' \t'
+
+# A debugging flag to catch any warnings. Critical errors will fail. 
+SHOW_WARNINGS = False
 
 class RawFormatter(HelpFormatter):
     
@@ -51,13 +54,25 @@ def unescape(string):
     '''
     The argument for "setting" or "value" could rightly include escaped special characters, notably "\t" for tab which is handy.
     
-    These transport literally as escaped stringss as a rule. But the -U/--UnescapeName and -i/--UnescapeValue options will pass
-    through here before continuing. These may transport regular expressions or pythonic strings so there an argparse tester built
+    These transport literally as escaped strings as a rule. But the -U/--UnescapeName and -i/--UnescapeValue options will pass
+    through here before continuing. These may transport regular expressions or pythonic strings so an argparse tester was built
     to evolve this compromise which will deliver the best of both worlds. Basiclly the \b code is the only real overlap of 
     relevance that ast.literal_eval breaks, so we protect it.
     '''
-    return ast.literal_eval("'"+string.replace(r'\b', r'\\b')+"'").replace(r'\\b', r'\b')
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=SyntaxWarning)    
+        return ast.literal_eval("'"+string.replace(r'\b', r'\\b')+"'").replace(r'\\b', r'\b')
 
+def leading_and_trailing_whitespace(s):
+    # Extract leading whitespace
+    leading_whitespace = re.match(r'^\s+', s)
+    leading_whitespace = leading_whitespace.group() if leading_whitespace else ''
+    
+    # Extract trailing whitespace
+    trailing_whitespace = re.search(r'\s+$', s)
+    trailing_whitespace = trailing_whitespace.group() if trailing_whitespace else ''
+    
+    return (leading_whitespace, trailing_whitespace)
 
 def get_or_set_setting(conf_file, setting, 
                        setting_value=None, 
@@ -67,10 +82,13 @@ def get_or_set_setting(conf_file, setting,
                        keep=False,
                        delete=False,
                        get=True, 
-                       get_whole_line=False, 
+                       get_whole_line=False,
+                       keep_quotes=False, 
                        multiple=False, 
                        regex_name=False, 
                        regex_name_case_insensitive=False, 
+                       setting_name_template=None,
+                       space_template=None,
                        regex_value=None, 
                        regex_value_case_insensitive=False, 
                        debug=None):
@@ -86,12 +104,17 @@ def get_or_set_setting(conf_file, setting,
     :param keep:             Keep existing setting (and comment it out, adding a new line after), else change existing setting line
     :param delete:           Delete the specified setting, or if multiple is True then the specified setting with the specified value.
     :param get:              Return the current value of the setting or a list of values if multiple is True 
-    :param get_whole_line:   Return the line the current value of the setting was defined on or a list of lines if multiple is True 
+    :param get_whole_line:   Return the line the current value of the setting was defined on or a list of lines if multiple is True
+    :param keep_quotes:      Menaingful only with 'get' asking it to keep any quotes, normally stripped 
     :param multiple:         All multiple definitions of this setting (don't replace an existing one or comment out any others, just add a new one after all existing ones unless before- or after- setting is supplied, respect that) 
     :param regex_name:       If true use 'setting' as a regular expression for name matching
-    :param regex_name_case_insensitive: Use 'setting' as a case insensitive regular expression
+    :param regex_name_case_insensitive: 
+                             Use 'setting' as a case insensitive regular expression
+    :param setting_name_template: 
+                             If a new line needs to be inserted, and no templates are found for setting_name in the file, it's handly to have one provided as a fall back.
     :param regex_value:      If a string, use it as a regular expression for value matching
-    :param regex_value_case_insensitive: Use regex_value as a case insensitive regular expression
+    :param regex_value_case_insensitive: 
+                             Use regex_value as a case insensitive regular expression
     :param debug:            Print extensive debug tracing information 
     '''
     def is_commented_out(line):
@@ -160,8 +183,21 @@ def get_or_set_setting(conf_file, setting,
 
     def prepare_for_parse():
         # Each is a dict keyed on line number 
+        replace_value.location_assign = {}
         replace_value.location_value = {}
         replace_value.location_comment = {}
+
+    def note_assign_location(s, loc, toks):
+        assert len(toks) == 1, f"Internal error: Only one matched value is expected, got {toks}"
+        value = toks[0]
+        if WHITE_SPACE in VALUE_CHARS:
+            value = value.strip()
+
+        location = (loc, loc+len(value))
+        line_number = note_value_location.line_number      
+        replace_value.location_assign[line_number] = location
+        
+        return [value]
 
     def note_value_location(s, loc, toks):
         assert len(toks) == 1, f"Internal error: Only one matched value is expected, got {toks}"
@@ -172,12 +208,16 @@ def get_or_set_setting(conf_file, setting,
         location = (loc, loc+len(value))
         line_number = note_value_location.line_number
         
-        if ASSIGN_CHAR and not isinstance(regex_value, str):
-            # An apparent pyparsing bug reported here:
-            #    https://github.com/pyparsing/pyparsing/issues/557
-            # When ASSIGN_CHAR is non empty the locations are captured short one.
-            # So we increment the locs by 1
+        # An apparent pyparsing bug reported here:
+        #    https://github.com/pyparsing/pyparsing/issues/557
+        # When ASSIGN_CHARS is non empty the locations are captured short one.
+        # So if there's a mismatch we increment the locs by 1 and try again
+        if s[location[0]:location[1]] != value:
+            if SHOW_WARNINGS:
+                sys.stderr.write("WARNING: Apparent pyparsing bug encountered and attempted correction.\n")
             location = tuple([l+1 for l in location])
+            if s[location[0]:location[1]] != value:
+                raise(ValueError, "Internal Error finding location of detected value!")
         
         replace_value.location_value[line_number] = location
         
@@ -194,7 +234,7 @@ def get_or_set_setting(conf_file, setting,
         
         return toks
 
-    def define_parser(value_location_recorder, comment_location_recorder):
+    def define_parser(assign_location_recorder, value_location_recorder, comment_location_recorder):
         if regex_name:
             flag = re.IGNORECASE if regex_name_case_insensitive else 0
             setting_name = pp.Regex(setting, flag)
@@ -214,8 +254,8 @@ def get_or_set_setting(conf_file, setting,
             line_comment = pp.Empty()
             trailing_comment = pp.Empty()
             
-        if ASSIGN_CHAR:
-            assign = pp.Literal(ASSIGN_CHAR)
+        if ASSIGN_CHARS:
+            assign = pp.Literal(ASSIGN_CHARS).set_parse_action(assign_location_recorder)
         else:
             assign = pp.Empty()
         
@@ -223,14 +263,14 @@ def get_or_set_setting(conf_file, setting,
     
         parser = (line_comment +
                   setting_name("name") +
-                  assign +
+                  assign("assign") +
                   setting_value("value") +
                   trailing_comment("trailing_comment") +
                   eol).parse_with_tabs()
                   
         return parser
     
-    one_line_setting = define_parser(note_value_location, note_comment_location)
+    one_line_setting = define_parser(note_assign_location, note_value_location, note_comment_location)
 
     lines = conf_file.readlines()
 
@@ -248,18 +288,27 @@ def get_or_set_setting(conf_file, setting,
     insert_at = None
     insert_prefix = ""
     empty_lines_at_end = 0
+
+    existing_names = []
     existing_values = []
-    existing_values_lines = []
-    existing_values_line_numbers = []
+    existing_values_raw = []   # Without any quotes stripped
+    existing_values_lines = [] # The whole line the values were set on
+    existing_values_line_numbers = [] # The numbers of the lines the values were set on
+    pre_assign_space = []
+    assign_space = []
+    post_assign_space = []
     
     if debug:
         print(f"Update configuration:")
-        print(f"setting: {setting}")
-        print(f"NAME_CHARS: {repr(NAME_CHARS)}")
-        print(f"VALUE_CHARS: {repr(VALUE_CHARS)}")
-        print(f"ASSIGN_CHAR: {ASSIGN_CHAR}")
-        print(f"COMMENT_CHARS: {COMMENT_CHARS}")
-        print(f"PARSER: {one_line_setting}")
+        print(f"\tsetting name: {setting}")
+        print(f"\tsetting value: {setting_value}")
+        print(f"\tmulti-setting: {multiple}")
+        print(f"\tNAME_CHARS: {repr(NAME_CHARS)}")
+        print(f"\tVALUE_CHARS: {repr(VALUE_CHARS)}")
+        print(f"\tASSIGN_CHARS: {repr(ASSIGN_CHARS)}")
+        print(f"\tCOMMENT_CHARS: {repr(COMMENT_CHARS)}")
+        print(f"\tWHITE_SPACE: {repr(WHITE_SPACE)}")
+        print(f"\tPARSER: {one_line_setting}")
      
     # Parse the lines and identify where the setting is used and a change if any should be made
     #
@@ -278,6 +327,13 @@ def get_or_set_setting(conf_file, setting,
             note_comment_location.line_number = i
             result = one_line_setting.parse_string(line)
             
+            # If parsing succeed caputure the whitespace around the ASSIGN if it exists
+            if ASSIGN_CHARS:
+                pre_assign_space.append(leading_and_trailing_whitespace(line[:replace_value.location_assign[i][0]])[1])
+                post_assign_space.append(leading_and_trailing_whitespace(line[replace_value.location_assign[i][1]:])[0])
+            else:
+                assign_space.append(leading_and_trailing_whitespace(line[:replace_value.location_value[i][0]])[1])
+
             # Find an insertion point for later use 
             if before_setting and result.name == before_setting and not is_commented_out(line):
                 insert_at = i  
@@ -293,17 +349,20 @@ def get_or_set_setting(conf_file, setting,
             # And hence only matching lines should parse. But no harm in checking and certainly can't  compare name against 
             # setting!
             flag = re.IGNORECASE if regex_name_case_insensitive else 0
-            name_matches = re.fullmatch(setting, result.name, flag) if regex_name else result.name == setting 
+            name_matches = re.fullmatch(setting, result.name, flag) if regex_name else result.name == setting
             if name_matches:
+                # TODO: We could look at commented lines for name tempates too. What are the consequences of recording them as values and lines and numbers too?
                 if not is_commented_out(line):
                     # If the value is quoted return its literal value (no quotes)
                     value = result.value[1:-1] if is_quoted_string(result.value) else result.value
                     # Add a newline to make it compatible with the updated_lines return
                     # That is, a list of new-line terminated strings
-                    existing_values.append(f"{value}\n")  
+                    existing_names.append(result.name)  
+                    existing_values.append(value)  
+                    existing_values_raw.append(result.value)  
                     existing_values_lines.append(f"{line}")  
                     existing_values_line_numbers.append(i)
-                    
+                
                 # If multiple entries are supported we need also to match the 
                 # provided value to request a change at this line.
                 # Techncially checking against the regex here is superfluous given define_parser already matched only on the regex
@@ -349,6 +408,11 @@ def get_or_set_setting(conf_file, setting,
                     print(f"\t{line=}")
                     print(f"Line with numbers:")
                     print(pp.testing.with_line_numbers(line))
+            else:
+                if debug:
+                    print(f"Line {i+1}: Name did not match")
+                    print(f"\t{setting=}")
+                    print(f"\t{result.name=}")
                 
         except pp.ParseException as e:
             if debug:
@@ -370,9 +434,13 @@ def get_or_set_setting(conf_file, setting,
             raise Exception(f"Error: multiple lines defining the {setting} found when -m/--multiple was not specified.")
         elif existing_values:
             if multiple:
-                return existing_values_lines if get_whole_line else existing_values
+                return existing_values_lines if get_whole_line \
+                       else [f"{v}\n" for v in existing_values_raw] if args.quotes \
+                       else [f"{v}\n" for v in existing_values]
             else:
-                return existing_values_lines[0] if get_whole_line else existing_values[0]
+                return existing_values_lines[0] if get_whole_line \
+                       else f"{existing_values_raw[0]}\n" if args.quotes \
+                       else f"{existing_values[0]}\n"
         else:
             return None
     elif delete and multiple and not (setting_value and not regex_value):
@@ -476,8 +544,47 @@ def get_or_set_setting(conf_file, setting,
             # to insert a new line, either at a discovered selected spot or at end.
             if not delete:
                 if not comment: comment = f"Added by {__prog__}"
-                assign = "" if ASSIGN_CHAR is None else f"{ASSIGN_CHAR} "
-                new_setting = f"{insert_prefix}{setting} {assign}{setting_value} # {comment}\n"
+                assign = "" if ASSIGN_CHARS is None else ASSIGN_CHARS
+                if regex_name: 
+                    if existing_names:
+                        # Use the shortest matching name as a template
+                        setting_name = min(existing_names, key=len)
+                    elif setting_name_template:
+                        # Use a template if it's provided
+                        setting_name = setting_name_template
+                    else:
+                        # Take a best guess from the regex.
+                        # Replace all \s+ with a Tabs, and sanitize by removing 
+                        # all characters that are not NAME_CHARS. This can be 
+                        setting_name = ''.join(filter(
+                                                lambda char: char in pp.alphas+NAME_CHARS, 
+                                                setting.replace(r'\s+', space_template)))
+                else:
+                    setting_name = setting
+
+                if assign:
+                    pre_space = max(pre_assign_space, key=len)
+                    post_space = max(post_assign_space, key=len)
+                    if len(pre_assign_space) == 0:
+                        pre_space = space_template if space_template else " "
+                    if len(post_assign_space) == 0:
+                        post_space = space_template if space_template else " "
+                else:
+                    pre_space = ""
+                    # No assigment character implies an odd format. We'd like to try and honour 
+                    # witnessed spacing so check for the last whitwspace group in a matching 
+                    # name in hope. Or fall back on some sensible defaults.
+                    if len(assign_space) > 0:
+                        post_space = max(assign_space, key=len)
+                    elif match:=re.search(r'\s+(?!.*\s)', setting_name):
+                        post_space = match.group()
+                    # If there's no clue in the setting name use history if it's available
+                    elif space_template:
+                        post_space = space_template
+                    else:
+                        post_space = ""
+                    
+                new_setting = f"{insert_prefix}{setting_name}{pre_space}{assign}{post_space}{setting_value} # {comment}\n"
                 if insert_at is None:
                     # Append new setting (but secure at least one blank line between the 
                     # appended definition and the original file contents).
@@ -556,7 +663,10 @@ if __name__ == "__main__":
 
     parser = ArgumentParser(description=program_description, formatter_class=RawFormatter, prog=__prog__)
 
-    parser.add_argument('setting', help='Name of the setting to update')
+    mandatory_set = parser.add_mutually_exclusive_group(required=True)
+    mandatory_set.add_argument('setting', nargs='?', help='Name of the setting to update')
+    mandatory_set.add_argument('-p', '--python', action='store_true', help=f'Print the Python version being used and internal configurations.')   
+
     parser.add_argument('value', nargs='?', default=None, help='New value for the setting')
 
     parser.add_argument('-c', '--comment', nargs='?', default=None, help='Update the comment if any or add a new end of line comment to the line we modify or add.')
@@ -569,6 +679,7 @@ if __name__ == "__main__":
     
     parser.add_argument('-m', '--multiple', action='store_true', help=f'Permit multiple definitions of this setting.')   
     parser.add_argument('-k', '--keep', action='store_true', help='Keep the existing definition (commenting it out) and add a new line (else, replace an existing definition)')
+    parser.add_argument('-q', '--quotes', action='store_true', help=f'Used with --list/-l will preserve quote marks around values when listing them')   
 
     # Short and long form for case insensitive regex matches
     # Name regexes can use the "setting" argument
@@ -583,8 +694,8 @@ if __name__ == "__main__":
     parser.add_argument('--RegExValue', nargs=1, default=None, help='Treat the provided value as a case sensitive regular expression when looking for setting value matches.')
 
     # Whitespace permission in names or values 
-    # Makes no sense if both these are specified and ASSIGN_CHAR is None (as there'd be no way to separate the name and value on a line
-    # If only one allows whitespace and the ASSIGN_CHAR is None then whitespaces belongs to that elemetn that can hold it but is trimmed (only intrnal whitepsace is ever meaningful). 
+    # Makes no sense if both these are specified and ASSIGN_CHARS is None (as there'd be no way to separate the name and value on a line
+    # If only one allows whitespace and the ASSIGN_CHARS is None then whitespaces belongs to that elemetn that can hold it but is trimmed (only intrnal whitepsace is ever meaningful). 
     parser.add_argument('-W', '--WhiteSpaceNames', action='store_true', help='Explictly allow white space in setting names')
     parser.add_argument('-w', '--WhiteSpaceValues', action='store_true', help='Explictly allow white space in setting values')
 
@@ -594,6 +705,8 @@ if __name__ == "__main__":
     # slight risks unencoding poses in that space we don't do it unless asked.   
     parser.add_argument('-U', '--UnescapeName', action='store_true', help=r'If the name contains escaped values like \t, use this option to have it unescaped (to a TAB).')
     parser.add_argument('-u', '--UnescapeValue', action='store_true', help=r'If the value contains escaped values like \t, use this option to have it unescaped (to a TAB).')
+
+    parser.add_argument('--Warnings', action='store_true', help=r'Show warnings. Else they are not shown.')
 
     group_input = parser.add_mutually_exclusive_group(required=False)
     group_input.title = "Input"
@@ -610,10 +723,12 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--test', action='store_true', help='Test mode (non-descructive, and prints input/ouput context diff')
     
     # Some config file parser configurations    
-    parser.add_argument('-A', '--AssignmentCharacter', nargs='?', default=None, const='', help=f'Defines the assignement character. Default is {ASSIGN_CHAR}. Provide an empty string for a null operation.')   
-    parser.add_argument('-C', '--CommentCharacter', nargs='?', default=None, const='', help=f'Defines the comment character. Default is {COMMENT_CHARS}. Provide an empty string to disable comment parsing (no comments are supported)')
-    parser.add_argument('-N', '--NameCharacters', nargs='?', default=None, const='', help=f'Defines the assignement character. Default is {ASSIGN_CHAR}. Provide a string containing all the characters allowed in setting names.')   
-    parser.add_argument('-V', '--ValueCharacters', nargs='?', default=None, const='', help=f'Defines the assignement character. Default is {ASSIGN_CHAR}. Provide a string containing all the characters allowed in setting values.')   
+    parser.add_argument('-A', '--AssignmentCharacter', nargs='?', default=None, const='', help=f'Defines the assignement characters. Default is {ASSIGN_CHARS}. Provide an empty string for a null operation.')   
+    parser.add_argument('-C', '--CommentCharacter', nargs='?', default=None, const='', help=f'Defines the comment characters. Default is {COMMENT_CHARS}. Provide an empty string to disable comment parsing (no comments are supported)')
+    parser.add_argument('-N', '--NameCharacters', nargs='?', default=None, const='', help=f'Defines the characters allowed in setting names. Default is {NAME_CHARS}. Provide a string containing all the characters allowed.')   
+    parser.add_argument('-V', '--ValueCharacters', nargs='?', default=None, const='', help=f'Defines the allowed in setting names. Default is {VALUE_CHARS}. Provide a string containing all the characters allowed.')   
+    parser.add_argument('-T', '--TemplateName', nargs='?', default=None, const='', help=f'Defines a template setting name to use for inserts if required. A best guess will be taken if needed, but it\'s safe to provide one.')   
+    parser.add_argument('-S', '--Space', nargs='?', default='\t', const='', help=f'Defines a template for white space separators if a new line needs to be created. Default is one tab character.')
 
     # Some understood shortcuts for chose of comment and assign chars.
     group_shortcuts = parser.add_mutually_exclusive_group(required=False)
@@ -630,6 +745,9 @@ if __name__ == "__main__":
     parser.add_argument('-D', '--Debug', nargs='?', default=None, const=True, help='Print each token as it\'s processed')
 
     args = parser.parse_args()
+
+    # Capture as a global
+    SHOW_WARNINGS = args.Warnings
 
     # Cross group mutual exclusions (argparse can't handle that internally)
     if args.value and args.delete and not args.multiple:
@@ -652,6 +770,9 @@ if __name__ == "__main__":
             parser.error("argument -b/--before: not allowed with argument -l/--list")
         if args.after is not None:
             parser.error("argument -a/--after: not allowed with argument -l/--list")
+    
+    if args.quotes and not args.list:
+        parser.error("argument -q/--quotes: only allowed with argument -l/--list")
 
     if args.keep:
         if args.before is not None:
@@ -668,37 +789,39 @@ if __name__ == "__main__":
     # Known basic configurations
     # Explicitly setting Assign or Comment overrides either.
     if args.postgres:
-        ASSIGN_CHAR = '='
+        ASSIGN_CHARS = '='
         COMMENT_CHARS = '#'
         NAME_CHARS = '-_'
         VALUE_CHARS = '-._'
     elif args.postgres_hba:
-        ASSIGN_CHAR = None
+        ASSIGN_CHARS = None
         COMMENT_CHARS = '#'
+        NAME_CHARS = '-_'
+        #NAME_CHARS = '-_'  + WHITE_SPACE # Breaks test 27
         VALUE_CHARS = ':/-.' + WHITE_SPACE
     elif args.ssh:
-        ASSIGN_CHAR = None
+        ASSIGN_CHARS = None
         COMMENT_CHARS = '#'
-        NAME_CHARS = '_'
+        NAME_CHARS = '_' 
         VALUE_CHARS = '-._/:~*' + WHITE_SPACE
     elif args.sudo:
-        ASSIGN_CHAR = None
+        ASSIGN_CHARS = None
         COMMENT_CHARS = '#'
         NAME_CHARS = '%_'
         VALUE_CHARS = '-._/():="\'' + WHITE_SPACE
     elif args.php:
-        ASSIGN_CHAR = '='
+        ASSIGN_CHARS = '='
         COMMENT_CHARS = ';'
         NAME_CHARS = '_'
         VALUE_CHARS = '-._/()#&~*' + WHITE_SPACE
     elif args.uwsgi:
-        ASSIGN_CHAR = '='
+        ASSIGN_CHARS = '='
         COMMENT_CHARS = '#'
         NAME_CHARS = '-'
         VALUE_CHARS = '-._/:' + WHITE_SPACE
 
-    if ASSIGN_CHAR is None and args.WhiteSpaceNames and args.WhiteSpaceValues:
-        parser.error("arguments -W/--WhiteSpaceNames and -w/--WhiteSpaceValues cannot both be specified is there is no ASSIGN_CHAR (use -A/AssignmentCharacter to specify one)")
+    if ASSIGN_CHARS is None and args.WhiteSpaceNames and args.WhiteSpaceValues:
+        parser.error("arguments -W/--WhiteSpaceNames and -w/--WhiteSpaceValues cannot both be specified is there is no ASSIGN_CHARS (use -A/AssignmentCharacter to specify one)")
 
     # A DRY function to extract configuration arguments
     def get_arg(arg_value, default, allow_empty=True, arg_name=None):
@@ -714,7 +837,7 @@ if __name__ == "__main__":
 
     # Explicit configurations override the shortucts above
     COMMENT_CHARS = get_arg(args.CommentCharacter, COMMENT_CHARS)
-    ASSIGN_CHAR = get_arg(args.AssignmentCharacter, ASSIGN_CHAR)
+    ASSIGN_CHARS = get_arg(args.AssignmentCharacter, ASSIGN_CHARS)
     NAME_CHARS = get_arg(args.NameCharacters, NAME_CHARS, False, '-N/--NameCharacters')
     VALUE_CHARS = get_arg(args.ValueCharacters, VALUE_CHARS, False, '-V/--ValueCharacters')
     
@@ -727,8 +850,20 @@ if __name__ == "__main__":
     if args.Debug:
         import traceback
     
+    if args.python:
+        print(f"Python: {sys.version}")
+        print(f"Confed: {__version__}")
+        print(f"\tFirst published: {__date__}")
+        print(f"\tLast updated: {__updated__}")
+        print(f"Configurations:")
+        print(f"\tNAME_CHARS: {repr(NAME_CHARS)}")
+        print(f"\tVALUE_CHARS: {repr(VALUE_CHARS)}")
+        print(f"\tASSIGN_CHARS: {repr(ASSIGN_CHARS)}")
+        print(f"\tCOMMENT_CHARS: {repr(COMMENT_CHARS)}")
+        print(f"\tWHITE_SPACE: {repr(WHITE_SPACE)}")
+        exit(0)
     # Read the config file 
-    if args.input:
+    elif args.input:
         source = open(args.input, 'r')
         if args.test:
             diff_source_path = args.input
@@ -761,9 +896,12 @@ if __name__ == "__main__":
                                     args.delete, 
                                     args.list, 
                                     args.List, 
+                                    args.quotes, 
                                     args.multiple,
                                     args.regex_name or args.RegExName,   # Use args.setting as a regex on the name match
                                     args.RegExName,                      # Make the test case sensitive
+                                    args.TemplateName,
+                                    args.Space,
                                     args.regex_value[0] if args.regex_value else args.RegExValue[0] if args.RegExValue else None, # A string to use as a value regex (or None)   
                                     bool(args.RegExValue),               # Make the value regex case insensitive       
                                     args.Debug)

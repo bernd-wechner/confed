@@ -6,7 +6,7 @@ cd $SCRIPT_DIR/data
 
 # Define usage function
 usage() {
-    echo "Usage: $0 -V [test-number]"
+    echo "Usage: $0 -VW [test-number]"
     echo
     echo Runs tests and reports PASSED or FAILED for each one and if FAILED a diff between 
     echo the expected result and what is being produced. 
@@ -18,15 +18,19 @@ usage() {
     echo		from git.  Useful if you add new test cases to test.conf. if the script 
     echo        passes all tests as is, and you add new lines to test.conf you can run 
     echo		$0 -V to set new references quickly and easily.
+    echo
+    echo -W     Show warnings during test run. 
     exit 1
 }
 
 # Parse command-line options
 validate=false
+warn=
 test_number=""
-while getopts "Vh" opt; do
+while getopts "VWh" opt; do
     case $opt in
         V) validate=true ;;
+        W) warn='--Warnings';; # confed command line option for showing warnings
         h) usage ;;
         *) usage ;;
     esac
@@ -76,7 +80,7 @@ check_result() {
 
 if [[ -z "$test_number" || "$test_number" -eq 1 ]]; then
 	test="01 - existing-setting-update"
-	$confed -i test.conf existing_string_setting new_value > "$test.result"
+	$confed $warn -i test.conf existing_string_setting new_value > "$test.result"
 	check_result "$test" test.conf
 fi
 
@@ -85,7 +89,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 2 ]]; then
 	test="02 - commented-setting-update"
-	$confed -i test.conf commented_setting new_value -o "$test.result"
+	$confed $warn -i test.conf commented_setting new_value -o "$test.result"
 	check_result "$test" test.conf
 fi
 
@@ -94,7 +98,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 3 ]]; then
 	test="03 - numeric-value-update"
-	$confed -i test.conf existing_numeric_setting 13 -o "$test.result"
+	$confed $warn -i test.conf existing_numeric_setting 13 -o "$test.result"
 	check_result "$test" test.conf
 fi
 
@@ -103,7 +107,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 4 ]]; then
 	test="04 - united-number-setting-update"
-	$confed -i test.conf united_number_setting 24hours -o "$test.result"
+	$confed $warn -i test.conf united_number_setting 24hours -o "$test.result"
 	check_result "$test" test.conf
 fi
 
@@ -112,7 +116,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 5 ]]; then
 	test="05 - add-new-setting"
-	$confed -i test.conf a_new_setting "with_a_new_value" -o "$test.result"
+	$confed $warn -i test.conf a_new_setting "with_a_new_value" -o "$test.result"
 	check_result "$test" test.conf
 fi
 
@@ -121,7 +125,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 6 ]]; then
 	test="06 - add-new-setting-before"
-	$confed -i test.conf a_new_setting "with_a_new_value" -b existing_string_setting -o "$test.result"
+	$confed $warn -i test.conf a_new_setting "with_a_new_value" -b existing_string_setting -o "$test.result"
 	check_result "$test" test.conf
 fi
 
@@ -130,7 +134,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 7 ]]; then
 	test="07 - add-new-setting-after"
-	$confed -i test.conf a_new_setting "with_a_new_value" -a commented_setting -o "$test.result"
+	$confed $warn -i test.conf a_new_setting "with_a_new_value" -a commented_setting -o "$test.result"
 	check_result "$test" test.conf
 fi
 
@@ -139,7 +143,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 8 ]]; then
 	test="08 - delete setting"
-	$confed -i test.conf united_number_setting -dk -c "Disabled by confed" -o "$test.result"
+	$confed $warn -i test.conf united_number_setting -dk -c "Disabled by confed" -o "$test.result"
 	check_result "$test" test.conf
 fi
 
@@ -149,7 +153,7 @@ fi
 if [[ -z "$test_number" || "$test_number" -eq 9 ]]; then
 	test="09 - explicit-inplace"
 	cp test.conf temp.conf
-	$confed -I temp.conf existing_string_setting new_value
+	$confed $warn -I temp.conf existing_string_setting new_value
 	mv temp.conf "$test.result"
 	check_result "$test" test.conf
 fi
@@ -160,7 +164,7 @@ fi
 if [[ -z "$test_number" || "$test_number" -eq 10 ]]; then
 	test="10 - implicit-inplace" 
 	cp test.conf temp.conf
-	$confed -i temp.conf existing_string_setting new_value -o temp.conf 
+	$confed $warn -i temp.conf existing_string_setting new_value -o temp.conf 
 	mv temp.conf "$test.result"
 	check_result "$test" test.conf
 fi
@@ -171,7 +175,7 @@ fi
 if [[ -z "$test_number" || "$test_number" -eq 11 ]]; then
 	test="11 - add with comment"
 	cp test.conf temp.conf
-	$confed -i temp.conf new_setting new_value -c "with my new comment" -o temp.conf 
+	$confed $warn -i temp.conf new_setting new_value -c "with my new comment" -o temp.conf 
 	mv temp.conf "$test.result"
 	check_result "$test" test.conf
 fi 
@@ -181,7 +185,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 12 ]]; then
 	test="12 - update with comment update"
-	$confed -i test.conf existing_string_setting new_value -c "with my new comment" -o "$test.result"
+	$confed $warn -i test.conf existing_string_setting new_value -c "with my new comment" -o "$test.result"
 	check_result "$test" test.conf
 fi
 
@@ -190,7 +194,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 13 ]]; then
 	test="13 - update with new comment"
-	$confed -i test.conf existing_numeric_setting 30sec -c "with my new comment" -o "$test.result"
+	$confed $warn -i test.conf existing_numeric_setting 30sec -c "with my new comment" -o "$test.result"
 	check_result "$test" test.conf
 fi
 
@@ -199,7 +203,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 14 ]]; then
 	test="14 - a noequal setting"
-	$confed -i test.conf a_no_equal_setting a_new_value -c "with a new comment" -A -o "$test.result" 
+	$confed $warn -i test.conf a_no_equal_setting a_new_value -c "with a new comment" -A -o "$test.result" 
 	check_result "$test" test.conf
 fi
 
@@ -208,7 +212,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 15 ]]; then
 	test="15 - ssh config test - modify"
-	$confed --ssh -i test.ssh PermitRootLogin no -c "disable root login" -o "$test.result" 
+	$confed $warn --ssh -i test.ssh PermitRootLogin no -c "disable root login" -o "$test.result" 
 	check_result "$test" test.ssh
 fi
 
@@ -217,7 +221,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 16 ]]; then
 	test="16 - ssh config test - add multi"
-	$confed --ssh -i test.ssh ListenAddress "127.0.0.1" -c "add local loopback" -m -o "$test.result" 
+	$confed $warn --ssh -i test.ssh ListenAddress "127.0.0.1" -c "add local loopback" -m -o "$test.result" 
 	check_result "$test" test.ssh
 fi
 
@@ -226,7 +230,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 17 ]]; then
 	test="17 - ssh config test - del multi"
-	$confed --ssh -i test.ssh -d ListenAddress "::" -m -o "$test.result" 
+	$confed $warn --ssh -i test.ssh -d ListenAddress "::" -m -o "$test.result" 
 	check_result "$test" test.ssh
 fi
 
@@ -235,7 +239,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 18 ]]; then
 	test="18 - sudoers config test"
-	$confed --sudo -i test.sudo -mdk Defaults mail_badpass -o "$test.result" 
+	$confed $warn --sudo -i test.sudo -mdk Defaults mail_badpass -o "$test.result" 
 	check_result "$test" test.sudo
 fi
 
@@ -244,7 +248,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 19 ]]; then
 	test="19 - sudoers config test - modify"
-	$confed --sudo -i test.sudo "%admin" "ALL=NOPASSWD: ALL" -c "Fix admin acccess" -o "$test.result" 
+	$confed $warn --sudo -i test.sudo "%admin" "ALL=NOPASSWD: ALL" -c "Fix admin acccess" -o "$test.result" 
 	check_result "$test" test.sudo
 fi
 
@@ -253,7 +257,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 20 ]]; then
 	test="20 - sudoers config test - complex multiple delete"
-	$confed --sudo -WRA "=" -i test.sudo -dk "Defaults\s+secure_path" -c "Remove secure path" -o "$test.result" 
+	$confed $warn --sudo -WRA "=" -i test.sudo -dk "Defaults\s+secure_path" -c "Remove secure path" -o "$test.result" 
 	check_result "$test" test.sudo
 fi
 
@@ -262,7 +266,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 21 ]]; then
 	test="21 - php config test"
-	$confed --php -i test.php error_reporting "E_ALL & ~E_DEPRECATED" -c "Modified by confed" -o "$test.result" 
+	$confed $warn --php -i test.php error_reporting "E_ALL & ~E_DEPRECATED" -c "Modified by confed" -o "$test.result" 
 	check_result "$test" test.php
 fi
 
@@ -271,7 +275,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 22 ]]; then
 	test="22 - php config test - file path"
-	$confed --php -i test.php error_log "'/var/log/php.log'" -o "$test.result" 
+	$confed $warn --php -i test.php error_log "'/var/log/php.log'" -o "$test.result" 
 	check_result "$test" test.php
 fi
 
@@ -280,7 +284,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 23 ]]; then
 	test="23 - uwsgi config test - chown test"
-	$confed --uwsgi -i test.uwsgi logfile-chown "www-data:www-data" -c "Fixed by confed" -o "$test.result" 
+	$confed $warn --uwsgi -i test.uwsgi logfile-chown "www-data:www-data" -c "Fixed by confed" -o "$test.result" 
 	check_result "$test" test.uwsgi
 fi
 
@@ -289,7 +293,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 24 ]]; then
 	test="24 - uwsgi config test - multi delete test (regex value test)"
-	$confed --uwsgi -i test.uwsgi -mdkr "chown\s+.*" exec-asap -o "$test.result" 
+	$confed $warn --uwsgi -i test.uwsgi -mdkr "chown\s+.*" exec-asap -o "$test.result" 
 	check_result "$test" test.uwsgi
 fi
 
@@ -298,7 +302,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 25 ]]; then
 	test="25 - list single value"
-	$confed -li test.conf existing_string_setting -o "$test.result" 
+	$confed $warn -li test.conf existing_string_setting -o "$test.result" 
 	check_result "$test" test.list
 fi
 
@@ -307,7 +311,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 26 ]]; then
 	test="26 - list multiple values"
-	$confed --ssh -i test.ssh ListenAddress -lm -o "$test.result" 
+	$confed $warn --ssh -i test.ssh ListenAddress -lm -o "$test.result" 
 	check_result "$test" test.mlist
 fi
 
@@ -316,7 +320,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 27 ]]; then
 	test="27 - HBA config test - plain"
-	$confed --postgres-hba -lm host -i test.hba -o "$test.result" 
+	$confed $warn --postgres-hba -lm host -i test.hba -o "$test.result" 
 	check_result "$test" test.hba
 fi
 
@@ -325,7 +329,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 28 ]]; then
 	test="28 - HBA config test - regex name test"
-	$confed --postgres-hba -lmR 'host\s+all\s+all' -i test.hba -o "$test.result" 
+	$confed $warn --postgres-hba -lmR 'host\s+all\s+all' -i test.hba -o "$test.result" 
 	check_result "$test" test.hba-regex-name
 fi
 
@@ -334,7 +338,7 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 29 ]]; then
 	test="29 - Regex Value Find and Replace"
-	$confed --postgres-hba -muRr '127\.0\..*' 'host\s+all\s+all' "191.168.0.0/24\tscram-sha-256" -i test.hba -o "$test.result" 
+	$confed $warn --postgres-hba -muRr '127\.0\..*' 'host\s+all\s+all' "191.168.0.0/24\t\tscram-sha-256" -i test.hba -o "$test.result" 
 	check_result "$test" test.regex-find-and-replace
 fi
 
@@ -343,6 +347,35 @@ fi
 
 if [[ -z "$test_number" || "$test_number" -eq 30 ]]; then
 	test="30 - HBA config test - whole lines on regex match"
-	$confed --postgres-hba -LmR 'host\s+all\s+all' -i test.hba -o "$test.result" 
+	$confed $warn --postgres-hba -LmR 'host\s+all\s+all' -i test.hba -o "$test.result" 
 	check_result "$test" test.hba-regex-name-whole-lines
+fi
+
+############################################################################
+# Test 31:
+
+if [[ -z "$test_number" || "$test_number" -eq 31 ]]; then
+	test="31 - HBA config test - regex match add new multi entry"
+	$confed $warn --postgres-hba -muUR 'host\s+all\s+all' '191.168.0.0/24\t\tscram-sha-256' -i test.hba -o "$test.result" 
+	check_result "$test" test.hba-regex-new-multi
+fi
+
+############################################################################
+# Test 32:
+
+if [[ -z "$test_number" || "$test_number" -eq 32 ]]; then
+	test="32 - test of --quotes"
+	> "$test.result"
+	$confed $warn --postgres -l 'existing_string_setting' -i test.conf >> "$test.result"  
+	$confed $warn --postgres -lq 'existing_string_setting' -i test.conf >> "$test.result"  
+	check_result "$test" test.quotes
+fi
+
+############################################################################
+# Test 33:
+
+if [[ -z "$test_number" || "$test_number" -eq 33 ]]; then
+	test="33 - systemd unit test"
+	$confed $warn User newuser -i test.service -o "$test.result" 
+	check_result "$test" test.systemd
 fi

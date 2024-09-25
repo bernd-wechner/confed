@@ -125,8 +125,14 @@ Other important concepts:
 The test script tries to cover all the supported use cases  and variants (clearly, to keen an eye on stability and that everything still works when tweaking the script). Here's a (not exhaustive) list of them:
 
 - `confed -l setting_name < settings.conf`
-  Reads `settings.conf` and reports any value(s) that `setting_name` is set to.
+  Reads `settings.conf` and reports the value that `setting_name` is set to.
   
+- `confed -lm setting_name -i settings.conf`
+  Reads `settings.conf` and reports any values that `setting_name` is set to (for multi-settings, settings that can take on a number of values)
+  
+- `confed -lq setting_name < settings.conf`
+  Reads `settings.conf` and reports any value(s) that `setting_name` is set to including any quotation marks that it had around it.
+
 - `confed setting_name setting_value < old.conf >  new.conf`
 
   Reads `old.conf`, cleanly adds a line that sets s*etting_name* to *setting_value* and writes it to `new.conf` being as clean and clever about it as it can be.

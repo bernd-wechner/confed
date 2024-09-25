@@ -1,0 +1,9 @@
+[Unit]
+Description=A basic systemd unit
+
+[Service]
+User=newuser
+Group=servicegroup
+Type=oneshot
+ExecStart=/usr/bin/somebinary
+
