@@ -83,7 +83,7 @@ def get_or_set_setting(conf_file, setting,
                        delete=False,
                        get=True, 
                        get_whole_line=False,
-                       keep_quotes=False, 
+                       quoted_values=False, 
                        multiple=False, 
                        regex_name=False, 
                        regex_name_case_insensitive=False, 
@@ -105,7 +105,7 @@ def get_or_set_setting(conf_file, setting,
     :param delete:           Delete the specified setting, or if multiple is True then the specified setting with the specified value.
     :param get:              Return the current value of the setting or a list of values if multiple is True 
     :param get_whole_line:   Return the line the current value of the setting was defined on or a list of lines if multiple is True
-    :param keep_quotes:      Menaingful only with 'get' asking it to keep any quotes, normally stripped 
+    :param quoted_values:    Respect quoted values (on get, will return values with qoues and on set will replace value and quotes) 
     :param multiple:         All multiple definitions of this setting (don't replace an existing one or comment out any others, just add a new one after all existing ones unless before- or after- setting is supplied, respect that) 
     :param regex_name:       If true use 'setting' as a regular expression for name matching
     :param regex_name_case_insensitive: 
@@ -150,7 +150,10 @@ def get_or_set_setting(conf_file, setting,
             # A cue to comment the line out
             replace_with = old_value
         elif is_quoted_string(old_value): 
-            replace_with = old_value[0] + new_value + old_value[-1] 
+            if quoted_values:
+                replace_with = new_value
+            else:
+                replace_with = old_value[0] + new_value + old_value[-1] 
         elif WHITE_SPACE in VALUE_CHARS:
             # Capture the leading and trailing white space from the parsed old_value 
             # and respect it when patching in the new value. Leading and trailing white 
@@ -217,7 +220,7 @@ def get_or_set_setting(conf_file, setting,
                 sys.stderr.write("WARNING: Apparent pyparsing bug encountered and attempted correction.\n")
             location = tuple([l+1 for l in location])
             if s[location[0]:location[1]] != value:
-                raise(ValueError, "Internal Error finding location of detected value!")
+                raise Exception(f"Internal error: location of detected value not found! {value=}, {s=}, {location=}, {s[location[0]:location[1]]}")
         
         replace_value.location_value[line_number] = location
         
@@ -255,7 +258,7 @@ def get_or_set_setting(conf_file, setting,
             trailing_comment = pp.Empty()
             
         if ASSIGN_CHARS:
-            assign = pp.Literal(ASSIGN_CHARS).set_parse_action(assign_location_recorder)
+            assign = pp.Optional(pp.White()) + pp.Literal(ASSIGN_CHARS).set_parse_action(assign_location_recorder) + pp.Optional(pp.White())
         else:
             assign = pp.Empty()
         
@@ -679,7 +682,7 @@ if __name__ == "__main__":
     
     parser.add_argument('-m', '--multiple', action='store_true', help=f'Permit multiple definitions of this setting.')   
     parser.add_argument('-k', '--keep', action='store_true', help='Keep the existing definition (commenting it out) and add a new line (else, replace an existing definition)')
-    parser.add_argument('-q', '--quotes', action='store_true', help=f'Used with --list/-l will preserve quote marks around values when listing them')   
+    parser.add_argument('-q', '--quotes', action='store_true', help=f'Used with --list/-l will preserve quote marks around values when listing them, and if updating a value will update the quoted value')   
 
     # Short and long form for case insensitive regex matches
     # Name regexes can use the "setting" argument
@@ -771,9 +774,6 @@ if __name__ == "__main__":
         if args.after is not None:
             parser.error("argument -a/--after: not allowed with argument -l/--list")
     
-    if args.quotes and not args.list:
-        parser.error("argument -q/--quotes: only allowed with argument -l/--list")
-
     if args.keep:
         if args.before is not None:
             parser.error("argument -b/--before: not allowed with argument -k/--keep")
@@ -851,10 +851,11 @@ if __name__ == "__main__":
         import traceback
     
     if args.python:
-        print(f"Python: {sys.version}")
         print(f"Confed: {__version__}")
         print(f"\tFirst published: {__date__}")
         print(f"\tLast updated: {__updated__}")
+        print(f"Python: {sys.version}")
+        print(f"Pyparsing: {pp.__version__}")
         print(f"Configurations:")
         print(f"\tNAME_CHARS: {repr(NAME_CHARS)}")
         print(f"\tVALUE_CHARS: {repr(VALUE_CHARS)}")
